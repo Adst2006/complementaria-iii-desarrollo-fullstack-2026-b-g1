@@ -1,9 +1,6 @@
 # Guía de Actividad Práctica
 ## Desarrollo Fullstack · Semana 6 · Arquitectura en capas de una API
 
-**Nombre completo:** _(escribe aquí tu nombre)_
-**Usuario de GitHub:** _(escribe aquí tu usuario)_
-
 ---
 
 ## 1. Caso elegido
