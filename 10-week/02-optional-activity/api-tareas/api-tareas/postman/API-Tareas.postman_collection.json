@@ -1,0 +1,240 @@
+{
+  "info": {
+    "name": "API Tareas - Semana 10",
+    "description": "Colección de pruebas del CRUD de tareas. Ejecutar en orden (Collection Runner): crea una tarea, guarda su id en la variable tareaId y la usa en las demás peticiones.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "tareaId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. POST crear tarea (201)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+          "const body = pm.response.json();",
+          "pm.test('Devuelve id generado', () => pm.expect(body.id).to.be.a('number'));",
+          "pm.test('Título correcto', () => pm.expect(body.titulo).to.eql('Entregar actividad de la semana 10'));",
+          "pm.test('Nace sin completar', () => pm.expect(body.completada).to.be.false);",
+          "pm.test('Header Location presente', () => pm.expect(pm.response.headers.has('Location')).to.be.true);",
+          "pm.collectionVariables.set('tareaId', body.id);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Entregar actividad de la semana 10\",\n  \"descripcion\": \"Subir el repositorio con README, Swagger y Postman\",\n  \"prioridad\": \"ALTA\",\n  \"fechaLimite\": \"2026-10-15\",\n  \"completada\": false\n}" },
+        "url": { "raw": "{{baseUrl}}/api/tareas", "host": ["{{baseUrl}}"], "path": ["api", "tareas"] }
+      }
+    },
+    {
+      "name": "2. POST datos inválidos (400)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+          "const body = pm.response.json();",
+          "pm.test('Incluye error del título', () => pm.expect(body.errores).to.have.property('titulo'));",
+          "pm.test('Incluye error de la prioridad', () => pm.expect(body.errores).to.have.property('prioridad'));"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"\",\n  \"descripcion\": \"Sin título ni prioridad\"\n}" },
+        "url": { "raw": "{{baseUrl}}/api/tareas", "host": ["{{baseUrl}}"], "path": ["api", "tareas"] }
+      }
+    },
+    {
+      "name": "3. POST prioridad inexistente (400)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+          "pm.test('Mensaje explicativo', () => pm.expect(pm.response.json().mensaje).to.include('prioridad'));"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Tarea rara\",\n  \"prioridad\": \"URGENTISIMA\"\n}" },
+        "url": { "raw": "{{baseUrl}}/api/tareas", "host": ["{{baseUrl}}"], "path": ["api", "tareas"] }
+      }
+    },
+    {
+      "name": "4. GET listar tareas (200)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+          "pm.test('Respuesta es un arreglo', () => pm.expect(pm.response.json()).to.be.an('array'));",
+          "pm.test('Contiene la tarea creada', () => {",
+          "  const id = Number(pm.collectionVariables.get('tareaId'));",
+          "  pm.expect(pm.response.json().some(t => t.id === id)).to.be.true;",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/tareas", "host": ["{{baseUrl}}"], "path": ["api", "tareas"] }
+      }
+    },
+    {
+      "name": "5. GET filtrar pendientes (200)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+          "pm.test('Todas están pendientes', () => pm.expect(pm.response.json().every(t => t.completada === false)).to.be.true);",
+          "pm.test('Incluye la tarea creada', () => {",
+          "  const id = Number(pm.collectionVariables.get('tareaId'));",
+          "  pm.expect(pm.response.json().some(t => t.id === id)).to.be.true;",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/tareas?completada=false",
+          "host": ["{{baseUrl}}"], "path": ["api", "tareas"],
+          "query": [{ "key": "completada", "value": "false" }]
+        }
+      }
+    },
+    {
+      "name": "6. GET tarea por id (200)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+          "pm.test('Id coincide', () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('tareaId'))));",
+          "pm.test('Prioridad ALTA', () => pm.expect(pm.response.json().prioridad).to.eql('ALTA'));"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/tareas/{{tareaId}}", "host": ["{{baseUrl}}"], "path": ["api", "tareas", "{{tareaId}}"] }
+      }
+    },
+    {
+      "name": "7. GET tarea inexistente (404)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+          "pm.test('Mensaje de error', () => pm.expect(pm.response.json().mensaje).to.include('no encontrada'));"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/tareas/999999", "host": ["{{baseUrl}}"], "path": ["api", "tareas", "999999"] }
+      }
+    },
+    {
+      "name": "8. PUT actualizar tarea (200)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.test('Prioridad actualizada', () => pm.expect(body.prioridad).to.eql('MEDIA'));",
+          "pm.test('Fecha límite actualizada', () => pm.expect(body.fechaLimite).to.eql('2026-10-20'));"
+        ]}
+      }],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Entregar actividad de la semana 10\",\n  \"descripcion\": \"Plazo ampliado\",\n  \"prioridad\": \"MEDIA\",\n  \"fechaLimite\": \"2026-10-20\",\n  \"completada\": false\n}" },
+        "url": { "raw": "{{baseUrl}}/api/tareas/{{tareaId}}", "host": ["{{baseUrl}}"], "path": ["api", "tareas", "{{tareaId}}"] }
+      }
+    },
+    {
+      "name": "9. PUT tarea inexistente (404)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+        ]}
+      }],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Fantasma\",\n  \"prioridad\": \"BAJA\"\n}" },
+        "url": { "raw": "{{baseUrl}}/api/tareas/999999", "host": ["{{baseUrl}}"], "path": ["api", "tareas", "999999"] }
+      }
+    },
+    {
+      "name": "10. PATCH completar tarea (200)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+          "pm.test('Quedó completada', () => pm.expect(pm.response.json().completada).to.be.true);"
+        ]}
+      }],
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/tareas/{{tareaId}}/completar", "host": ["{{baseUrl}}"], "path": ["api", "tareas", "{{tareaId}}", "completar"] }
+      }
+    },
+    {
+      "name": "11. GET filtrar completadas (200)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+          "pm.test('Todas están completadas', () => pm.expect(pm.response.json().every(t => t.completada === true)).to.be.true);",
+          "pm.test('Incluye la tarea completada', () => {",
+          "  const id = Number(pm.collectionVariables.get('tareaId'));",
+          "  pm.expect(pm.response.json().some(t => t.id === id)).to.be.true;",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/tareas?completada=true",
+          "host": ["{{baseUrl}}"], "path": ["api", "tareas"],
+          "query": [{ "key": "completada", "value": "true" }]
+        }
+      }
+    },
+    {
+      "name": "12. DELETE eliminar tarea (204)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+        ]}
+      }],
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/tareas/{{tareaId}}", "host": ["{{baseUrl}}"], "path": ["api", "tareas", "{{tareaId}}"] }
+      }
+    },
+    {
+      "name": "13. GET tarea eliminada (404)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 404 tras eliminar', () => pm.response.to.have.status(404));"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/tareas/{{tareaId}}", "host": ["{{baseUrl}}"], "path": ["api", "tareas", "{{tareaId}}"] }
+      }
+    }
+  ]
+}
