@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Semana 12 · Frontend + API</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #f3f6f8;
+      color: #1f2933;
+      margin: 0;
+      padding: 2rem 1rem;
+    }
+    main { max-width: 480px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; color: #0b6e6e; margin-bottom: 1.5rem; }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    label { display: block; font-size: 0.85rem; margin-bottom: 0.25rem; }
+    input {
+      width: 100%;
+      padding: 0.55rem;
+      margin-bottom: 0.85rem;
+      border: 1px solid #c4ccd4;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+    button {
+      background: #0b6e6e;
+      color: #fff;
+      border: 0;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    button.secondary { background: #6b7785; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .msg { margin-top: 0.75rem; font-size: 0.9rem; }
+    .msg.loading { color: #6b7785; }
+    .msg.error { color: #b42318; background: #fef3f2; padding: 0.6rem; border-radius: 6px; }
+    ul { padding-left: 1.1rem; }
+    .hidden { display: none; }
+    code { background: #eef2f5; padding: 0.1rem 0.3rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Semana 12 · Integrar frontend y backend</h1>
+
+    <!-- LOGIN -->
+    <section id="login-view" class="card">
+      <h2>Iniciar sesión</h2>
+      <form id="login-form">
+        <label for="username">Usuario</label>
+        <input id="username" value="admin" autocomplete="username" required />
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" value="1234" autocomplete="current-password" required />
+        <button id="login-btn" type="submit">Entrar</button>
+      </form>
+      <div id="login-msg" class="msg"></div>
+    </section>
+
+    <!-- DATOS PROTEGIDOS -->
+    <section id="data-view" class="card hidden">
+      <h2>Datos protegidos</h2>
+      <p>Sesión iniciada como <strong id="user-name">…</strong></p>
+      <div class="actions">
+        <button id="load-btn">Cargar datos</button>
+        <button id="logout-btn" class="secondary">Cerrar sesión</button>
+      </div>
+      <div id="data-msg" class="msg"></div>
+      <div id="data-out"></div>
+    </section>
+  </main>
+
+  <script>
+    // Dirección del backend. Cámbiala si lo ejecutas en otro puerto o servidor.
+    const API_URL = "http://localhost:3000";
+    const TOKEN_KEY = "token";
+
+    const $ = (id) => document.getElementById(id);
+
+    // ---------- Utilidades de interfaz ----------
+    function setMsg(el, text, type = "") {
+      el.textContent = text;
+      el.className = "msg " + type;
+    }
+
+    function showView(loggedIn) {
+      $("login-view").classList.toggle("hidden", loggedIn);
+      $("data-view").classList.toggle("hidden", !loggedIn);
+    }
+
+    // ---------- Petición genérica a la API ----------
+    // Maneja: token en la cabecera, errores de red/CORS y errores HTTP.
+    async function api(path, { method = "GET", body, auth = false } = {}) {
+      const headers = {};
+      if (body) headers["Content-Type"] = "application/json";
+      if (auth) headers["Authorization"] = "Bearer " + localStorage.getItem(TOKEN_KEY);
+
+      let res;
+      try {
+        res = await fetch(API_URL + path, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+      } catch (err) {
+        // fetch lanza error si no hay conexión, el servidor está apagado o CORS bloquea la petición.
+        throw new Error(
+          "No se pudo conectar con el servidor. Revisa que el backend esté encendido y que CORS esté habilitado."
+        );
+      }
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (res.status === 401 && auth) {
+          logout();
+          throw new Error("Tu sesión expiró o el token no es válido. Inicia sesión de nuevo.");
+        }
+        throw new Error(data.error || "Error " + res.status);
+      }
+      return data;
+    }
+
+    // ---------- Login ----------
+    $("login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = $("login-btn");
+      btn.disabled = true;
+      setMsg($("login-msg"), "Entrando…", "loading");
+
+      try {
+        const { token } = await api("/login", {
+          method: "POST",
+          body: { username: $("username").value, password: $("password").value },
+        });
+        localStorage.setItem(TOKEN_KEY, token); // guardar el token
+        setMsg($("login-msg"), "");
+        enterApp($("username").value);
+      } catch (err) {
+        setMsg($("login-msg"), err.message, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ---------- Datos protegidos ----------
+    $("load-btn").addEventListener("click", async () => {
+      const btn = $("load-btn");
+      btn.disabled = true;
+      $("data-out").innerHTML = "";
+      setMsg($("data-msg"), "Cargando datos…", "loading");
+
+      try {
+        const data = await api("/datos-secretos", { auth: true });
+        setMsg($("data-msg"), data.message);
+        const ul = document.createElement("ul");
+        data.items.forEach((item) => {
+          const li = document.createElement("li");
+          li.textContent = item.titulo + " (" + item.estado + ")";
+          ul.appendChild(li);
+        });
+        $("data-out").appendChild(ul);
+      } catch (err) {
+        setMsg($("data-msg"), err.message, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ---------- Sesión ----------
+    function enterApp(name) {
+      $("user-name").textContent = name || "usuario";
+      setMsg($("data-msg"), "");
+      $("data-out").innerHTML = "";
+      showView(true);
+    }
+
+    function logout() {
+      localStorage.removeItem(TOKEN_KEY);
+      showView(false);
+    }
+
+    $("logout-btn").addEventListener("click", () => {
+      logout();
+      setMsg($("login-msg"), "");
+    });
+
+    // Al abrir la página, si ya hay token guardado, recupera el usuario desde la API.
+    (async function init() {
+      if (!localStorage.getItem(TOKEN_KEY)) return showView(false);
+      try {
+        const perfil = await api("/perfil", { auth: true });
+        enterApp(perfil.username);
+      } catch (err) {
+        setMsg($("login-msg"), err.message, "error");
+        showView(false);
+      }
+    })();
+  </script>
+</body>
+</html>
